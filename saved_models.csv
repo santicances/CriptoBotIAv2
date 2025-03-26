@@ -1,0 +1,17 @@
+Modelo,Score,Accuracy,Ruta
+model_Ind013_gen_3.keras,928.7953,100.00%,models/model_Ind013_gen_3.keras
+model_Ind015_gen_4.keras,856.5604,100.00%,models/model_Ind015_gen_4.keras
+model_Ind020_gen_4.keras,1295.724,100.00%,models/model_Ind020_gen_4.keras
+model_Ind023_gen_5.keras,1870.1361,100.00%,models/model_Ind023_gen_5.keras
+model_Ind024_gen_5.keras,1893.8041,99.43%,models/model_Ind024_gen_5.keras
+model_Ind037_gen_5.keras,845.6772,100.00%,models/model_Ind037_gen_5.keras
+model_Ind047_gen_6.keras,2752.5735,100.00%,models/model_Ind047_gen_6.keras
+model_Ind048_gen_6.keras,19986.6823,50.81%,models/model_Ind048_gen_6.keras
+model_Ind049_gen_6.keras,2251.2118,100.00%,models/model_Ind049_gen_6.keras
+model_Ind051_gen_6.keras,3642.8563,100.00%,models/model_Ind051_gen_6.keras
+model_Ind053_gen_6.keras,,49.19%,models/model_Ind053_gen_6.keras
+model_Ind054_gen_6.keras,2286.0699,99.43%,models/model_Ind054_gen_6.keras
+model_Ind055_gen_6.keras,4872.0511,100.00%,models/model_Ind055_gen_6.keras
+model_Ind064_gen_7.keras,,49.19%,models/model_Ind064_gen_7.keras
+model_Ind067_gen_8.keras,5544.6978,53.10%,models/model_Ind067_gen_8.keras
+model_Ind076_gen_8.keras,6296.2438,66.25%,models/model_Ind076_gen_8.keras
