@@ -1,0 +1,10 @@
+backtrader==1.9.78.123
+ccxt==4.3.41
+matplotlib==3.10.1
+numpy==2.2.4
+pandas==2.2.3
+Pillow==11.1.0
+scikit_learn==1.6.1
+tensorflow==2.17.0
+tensorflow_intel==2.17.0
+tqdm==4.66.5
