@@ -5,6 +5,7 @@ import numpy as np
 import random
 import matplotlib
 matplotlib.use("TkAgg")
+import re
 import matplotlib.pyplot as plt
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
@@ -18,6 +19,8 @@ from tensorflow.keras.utils import to_categorical
 import threading
 import time
 import datetime  # para fechas y horas
+
+
 
 # ===============================
 # VARIABLES GLOBALES Y FLAGS
@@ -76,6 +79,66 @@ def add_or_update_configuration(config_dict):
     else:
         df = pd.concat([df, row_df], ignore_index=True)
     save_configurations_csv(df)
+
+
+
+
+def update_configurations():
+    base_path = r"C:\Users\formacionIA\Desktop\arbitraje 2"
+    saved_models_file = os.path.join(base_path, "saved_models.csv")
+    configurations_file = os.path.join(base_path, "configurations.csv")
+    loss_history_folder = os.path.join(base_path, "loss_history")
+
+    # Leer modelos guardados
+    models_df = pd.read_csv(saved_models_file, encoding='utf-8')
+
+    # Extraer identificadores válidos (Ind013, Ind015, etc.)
+    pattern_model = re.compile(r"model_(Ind\d+)_gen_\d+\.keras")
+    valid_ids = {
+        match.group(1)
+        for model in models_df['Modelo']
+        if (match := pattern_model.search(str(model)))
+    }
+
+    # Leer el archivo de configuraciones con cabecera
+    config_df = pd.read_csv(configurations_file, encoding='utf-8')
+
+    # Extraer el ID limpio de la columna 'ID'
+    def extract_id(val):
+        if not isinstance(val, str):
+            return None
+        match = re.search(r"Ind\s*\d+", val)
+        return match.group(0).replace(" ", "") if match else None
+
+    config_df['clean_id'] = config_df['ID'].apply(extract_id)
+
+    # Filtrar solo las filas con IDs válidos
+    filtered_df = config_df[config_df['clean_id'].isin(valid_ids)].copy()
+    filtered_df.drop(columns=['clean_id'], inplace=True)
+
+    # Guardar el archivo actualizado
+    filtered_df.to_csv(configurations_file, index=False, encoding='utf-8')
+    print("✅ Archivo configurations.csv actualizado.")
+
+    # --- LIMPIEZA DE ARCHIVOS DE PÉRDIDA ---
+    if os.path.exists(loss_history_folder):
+        for filename in os.listdir(loss_history_folder):
+            filepath = os.path.join(loss_history_folder, filename)
+            match = re.match(r"(Ind\d+)_loss\.csv", filename)
+            if match:
+                model_id = match.group(1)
+                if model_id not in valid_ids:
+                    os.remove(filepath)
+                    print(f"🗑️  Eliminado: {filename}")
+    else:
+        print("⚠️  Carpeta loss_history no encontrada.")
+
+    print("✅ Limpieza de archivos de pérdida completada.")
+
+
+update_configurations()
+
+
 
 def reassign_generations(pop_size=DEFAULT_POPULATION_SIZE):
     """
@@ -571,13 +634,77 @@ def genetic_algorithm(population_size, generations, app_data):
     legend_data = []
     
     axes = {'mae': app_data["graf_ax"]}
-    app_data["graf_ax"].clear()
-    app_data["graf_ax"].set_title("Pérdida", fontsize=14, fontweight="bold")
-    app_data["graf_ax"].set_xlabel("Epoch", fontsize=12)
-    app_data["graf_ax"].set_ylabel("MAE", fontsize=12)
+    #app_data["graf_ax"].clear()
+    #app_data["graf_ax"].set_title("Pérdida", fontsize=14, fontweight="bold")
+    #app_data["graf_ax"].set_xlabel("Epoch", fontsize=12)
+    #app_data["graf_ax"].set_ylabel("MAE", fontsize=12)
 
     start_dt = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"\n=== Iniciando entrenamiento genético (fase) en {start_dt} ===")
+
+    def crossover_and_mutation(population, population_size, mutation_rate=0.2):
+        new_population = []
+        while len(new_population) < population_size:
+            parent1 = random.choice(population)
+            parent2 = random.choice(population)
+            while parent1 == parent2:
+                parent2 = random.choice(population)
+            child1, child2 = crossover(parent1, parent2)
+            child1 = mutate(child1, mutation_rate)
+            child2 = mutate(child2, mutation_rate)
+            new_population.append(child1)
+            if len(new_population) < population_size:
+                new_population.append(child2)
+            return new_population
+        
+    def crossover(parent1, parent2):
+       child1 = {
+        'layer_sizes': random.choice([parent1['layer_sizes'], parent2['layer_sizes']]),
+        'activation': random.choice([parent1['activation'], parent2['activation']]),
+        'optimizer': random.choice([parent1['optimizer'], parent2['optimizer']]),
+        'lr': random.choice([parent1['lr'], parent2['lr']]),
+        'batch_size': random.choice([parent1['batch_size'], parent2['batch_size']]),
+        'architecture': random.choice([parent1['architecture'], parent2['architecture']]),
+        'epochs': random.choice([parent1['epochs'], parent2['epochs']]),
+        'my_fitness': 999999
+        }
+       
+       child2 = dict(child1) 
+       
+       return child1, child2
+    
+  
+
+
+    def mutate(individual, mutation_rate):
+        if random.random() < mutation_rate:
+            individual['lr'] *= random.uniform(0.5, 1.5)
+            individual['lr'] = max(min(individual['lr'], 5e-2), 1e-5)  # mantener en rango válido
+
+        if random.random() < mutation_rate:
+            individual['batch_size'] = random.choice([8, 16, 32])
+
+        if random.random() < mutation_rate:
+            individual['activation'] = random.choice(activation_functions)
+
+        if random.random() < mutation_rate:
+            individual['optimizer'] = random.choice(list(optimizers_dict.keys()))
+
+        if random.random() < mutation_rate:
+            individual['architecture'] = random.choice(architectures)
+
+        if random.random() < mutation_rate:
+            individual['epochs'] = random.randint(epoch_range[0], epoch_range[1])
+
+        if random.random() < mutation_rate:
+            num_layers = random.randint(1, 5)
+            individual['layer_sizes'] = [random.randint(10, 128) for _ in range(num_layers)]
+
+        return individual
+
+    
+
+   
 
     for gen in range(current_generation, current_generation + generations):
         if finalize_flag.is_set():
@@ -717,6 +844,8 @@ def genetic_algorithm(population_size, generations, app_data):
 
         # 2) Cruzamos y mutamos => produce la poblacion para la siguiente gen
         population = crossover_and_mutation(population, population_size, mutation_rate=0.2)
+
+
         
         # *** Fin cruce/mutación
         app_data["lbl_phase"].config(text="Fase: Finalización de Generación")
@@ -1002,13 +1131,87 @@ def create_app():
     # -------------------------------------------------
     # PESTAÑA: GRÁFICOS
     # -------------------------------------------------
-    frame_graf = ttk.Frame(notebook, padding=10)
-    notebook.add(frame_graf, text="Gráficos")
-    
-    fig, ax = plt.subplots(figsize=(6,4))
-    canvas_fig = FigureCanvasTkAgg(fig, master=frame_graf)
-    canvas_fig.draw()
-    canvas_fig.get_tk_widget().pack(fill="both", expand=True)
+    frame_graph = ttk.Frame(notebook, padding=10)
+    notebook.add(frame_graph, text="Gráficos")
+
+    # Canvas con scrollbar para desplazar el contenido
+    canvas_graph = tk.Canvas(frame_graph, bg="white")
+    scrollbar = ttk.Scrollbar(frame_graph, orient="vertical", command=canvas_graph.yview)
+    canvas_graph.configure(yscrollcommand=scrollbar.set)
+    scrollbar.pack(side="right", fill="y")
+    canvas_graph.pack(side="left", fill="both", expand=True)
+
+    # Frame interno que contendrá los gráficos
+    inner_frame = ttk.Frame(canvas_graph)
+    canvas_graph.create_window((0, 0), window=inner_frame, anchor="nw")
+
+    # Configurar las 2 columnas para que se adapten al ancho
+    inner_frame.columnconfigure(0, weight=1)
+    inner_frame.columnconfigure(1, weight=1)
+
+    def on_frame_configure(event):
+        # Actualiza la región de scroll del canvas
+        canvas_graph.configure(scrollregion=canvas_graph.bbox("all"))
+    inner_frame.bind("<Configure>", on_frame_configure)
+
+    # Ruta de la carpeta que contiene los CSV de historial de pérdida
+    loss_history_folder = r"C:\Users\formacionIA\Desktop\arbitraje 2\loss_history"
+
+    # Se buscan los archivos que coincidan con el patrón: IndXXX_loss.csv
+    csv_files = [f for f in os.listdir(loss_history_folder) if re.match(r"Ind\d+_loss\.csv", f)]
+
+    if not csv_files:
+        ttk.Label(inner_frame, text="No se encontraron archivos de historial de pérdida.").pack(pady=10)
+    else:
+        # Lista de colores para asignar de forma cíclica a cada gráfica
+        colors = ['blue', 'green', 'red', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+        
+        for i, filename in enumerate(csv_files):
+            filepath = os.path.join(loss_history_folder, filename)
+            try:
+                data = pd.read_csv(filepath)
+            except Exception as e:
+                print(f"Error al leer {filename}: {e}")
+                continue
+            
+            # Se asume que el CSV contiene columnas 'Epoch' y 'Loss' o 'MAE'
+            if 'Epoch' in data.columns and 'Loss' in data.columns:
+                x = data['Epoch']
+                y = data['Loss']
+            elif 'Epoch' in data.columns and 'MAE' in data.columns:
+                x = data['Epoch']
+                y = data['MAE']
+            else:
+                x = data.index
+                y = data.iloc[:, 0]
+            
+            # Extraer el identificador del modelo (ej. "Ind013") a partir del nombre del archivo
+            match = re.match(r"(Ind\d+)_loss\.csv", filename)
+            model_id = match.group(1) if match else filename
+            
+            # Crear un frame para agrupar la etiqueta y la gráfica
+            chart_frame = ttk.Frame(inner_frame, relief="raised", borderwidth=1)
+            # Distribuir en 2 columnas: calcular fila y columna
+            row = i // 2
+            col = i % 2
+            chart_frame.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
+            
+            # Agregar una etiqueta con el título de la gráfica
+            ttk.Label(chart_frame, text=f"Loss History - {model_id}",
+                    font=("Helvetica", 12, "bold")).pack(pady=(10, 0))
+            
+            # Crear la figura y el eje para la gráfica
+            loss_fig, loss_ax = plt.subplots(figsize=(6, 4))
+            color = colors[i % len(colors)]
+            loss_ax.plot(x, y, color=color, marker='o', linestyle='-')
+            loss_ax.set_xlabel("Epoch")
+            loss_ax.set_ylabel("Loss")
+            loss_ax.set_title(f"Loss History - {model_id}")
+            
+            # Integrar la figura en el frame usando FigureCanvasTkAgg
+            canvas_fig = FigureCanvasTkAgg(loss_fig, master=chart_frame)
+            canvas_fig.draw()
+            canvas_fig.get_tk_widget().pack(pady=5)
 
     # -------------------------------------------------
     # PESTAÑA: MODELOS GUARDADOS
@@ -1228,15 +1431,17 @@ def create_app():
         root.destroy()
     
     root.protocol("WM_DELETE_WINDOW", on_closing)
-    
+    # Antes de definir app_data, crea una figura "dummy" para usarla como placeholder:
+  
+
     # Creamos el diccionario app_data con todo lo necesario
     app_data = {
         "root": root,
         "lbl_generation": lbl_generation,   # <-- La etiqueta de generación
         "tree_history": tree_history,
         "canvas": canvas,
-        "graf_fig": fig,
-        "graf_ax": ax,
+        "graf_fig": plt.subplots(figsize=(6, 4)),
+        "graf_ax": plt.subplots(figsize=(6, 4)),
         "canvas_fig": canvas_fig,
         "tree_saved_models": tree_saved_models,
         "tree_configs": tree_configs,
